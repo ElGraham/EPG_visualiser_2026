@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EPG Visualiser</title>
+<style>
+  :root{
+    --navy:#1F3864; --mid:#2E5A87; --amber:#B25E09; --teal:#3E7A4A;
+    --cream:#F6F3EC; --paper:#FFFFFF; --ink:#22252B; --line:#D9D3C4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--cream); color:var(--ink);
+  }
+  .wrap{max-width:1300px; margin:0 auto; padding:24px 20px 60px;}
+  .case-header{background:var(--navy); color:#fff; border-radius:6px 6px 0 0; padding:18px 24px; position:relative;}
+  .case-header .tag{font-size:12.5px; letter-spacing:0.04em; opacity:0.85; margin-bottom:4px;}
+  .case-header h1{margin:0; font-size:24px; font-weight:800;}
+  .stamp{
+    position:absolute; top:14px; right:18px; border:2px solid rgba(255,255,255,0.55);
+    color:rgba(255,255,255,0.75); padding:4px 10px; font-size:11px; font-weight:700;
+    letter-spacing:0.06em; border-radius:4px; transform:rotate(4deg);
+  }
+  .panel{background:#fff; border:1px solid var(--line); border-top:none; padding:18px 24px;}
+  .panel.instructions{font-size:14px; color:#4a4536; line-height:1.5;}
+  .panel.instructions b{color:var(--navy);}
+  .panel:last-child{border-radius:0 0 10px 10px; box-shadow:0 8px 24px rgba(31,56,100,0.08);}
+
+  h2{color:var(--navy); font-size:16px; margin:0 0 12px;}
+  .row{display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;}
+  .field{display:flex; flex-direction:column; gap:4px;}
+  .field label{font-size:12px; font-weight:700; color:#4a4536;}
+  .field input, .field select{
+    font-family:inherit; font-size:14px; padding:7px 9px; border:1.5px solid var(--line);
+    border-radius:5px; background:#fff;
+  }
+  .field input[type=number]{width:100px;}
+  .field input.name{width:220px;}
+
+  button{
+    font-family:inherit; border:none; border-radius:6px; padding:9px 16px; font-size:13.5px;
+    font-weight:700; cursor:pointer;
+  }
+  .btn-navy{background:var(--navy); color:#fff;}
+  .btn-navy:hover{background:var(--mid);}
+  .btn-amber{background:var(--amber); color:#fff;}
+  .btn-amber:hover{opacity:0.9;}
+  .btn-teal{background:var(--teal); color:#fff;}
+  .btn-teal:hover{opacity:0.9;}
+  .btn-ghost{background:#fff; border:1.5px solid var(--line); color:var(--ink);}
+  .btn-ghost:hover{border-color:var(--mid);}
+  .btn-remove{background:#FBF0E4; color:#B25E09; border:1px solid #EBD3B0; padding:5px 10px; font-size:12px;}
+  .btn-remove:hover{background:#F6DFC0;}
+  .btn-sm{padding:5px 10px; font-size:12px;}
+
+  .presets{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
+
+  .locus-card{
+    border:1.5px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px;
+    background:#FBF8F1;
+  }
+  .locus-card .head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .locus-card .head .title-fields{display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;}
+
+  table.alleles{width:100%; border-collapse:collapse; margin-top:6px;}
+  table.alleles th{
+    background:var(--mid); color:#fff; font-size:11.5px; padding:6px 8px; text-align:left;
+  }
+  table.alleles td{padding:5px 8px; border-bottom:1px solid var(--line); background:#fff;}
+  table.alleles input{width:100%; border:1px solid var(--line); border-radius:4px; padding:4px 6px; font-size:13px;}
+  table.alleles select{border:1px solid var(--line); border-radius:4px; padding:4px 4px; font-size:12.5px; width:100%;}
+
+  .legend{display:flex; gap:18px; flex-wrap:wrap; margin:10px 0 4px; font-size:12.5px;}
+  .legend span.dot{display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:5px; vertical-align:middle;}
+
+  canvas{width:100%; display:block; background:#fff; border:1px solid var(--line); border-radius:6px;}
+  .canvas-wrap{margin-top:10px;}
+  .empty-msg{padding:60px 20px; text-align:center; color:#8a8272; font-style:italic;}
+
+  .footer-row{display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:10px;}
+  .note{font-size:12px; color:#8a8272; font-style:italic;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="case-header">
+    <div class="tag">FORENSIC DNA TEACHING TOOLS</div>
+    <h1>EPG Visualiser</h1>
+    <div class="stamp">SOFTWARE</div>
+  </div>
+
+  <div class="panel instructions">
+    Build any DNA profile — single-source, mixture, degraded, with stutter or other artefacts — and see it
+    rendered as an electropherogram-style trace. Add a locus, assign it a dye channel, then list its alleles with
+    a size (bp), a peak height (RFU), and a type. The preview below updates live. When you're happy with it,
+    download it as a PNG to drop into slides, worksheets, or Kahoot/Mentimeter question images.
+    <br><br>
+    <b>This is an illustrative rendering tool, not real instrument software</b> — peaks are drawn as smooth
+    Gaussian curves from the numbers you enter, not derived from real fragment data.
+  </div>
+
+  <div class="panel">
+    <h2>Sample &amp; display settings</h2>
+    <div class="row">
+      <div class="field">
+        <label for="sampleName">Sample / case name</label>
+        <input type="text" id="sampleName" class="name" value="Sample 001 — illustrative profile">
+      </div>
+      <div class="field">
+        <label for="threshold">Analytical threshold (RFU)</label>
+        <input type="number" id="threshold" value="50" min="0" step="10">
+      </div>
+      <div class="field">
+        <label for="peakWidth">Peak width (bp)</label>
+        <input type="number" id="peakWidth" value="0.3" min="0.05" step="0.05">
+      </div>
+      <div class="field">
+        <label for="showHeights">Peak labels</label>
+        <label style="font-weight:400; font-size:13px; display:flex; align-items:center; gap:6px; padding-top:6px;">
+          <input type="checkbox" id="showHeights" checked onchange="renderEPG()"> Show height (RFU) under allele call
+        </label>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn-ghost" onclick="clearAll()">Clear all loci</button>
+      </div>
+    </div>
+    <h2 style="margin-top:6px;">Quick-start examples (NGM SElect, verified dye channels)</h2>
+    <div class="presets" id="libraryButtons"></div>
+    <p class="note" style="margin:8px 0 0;">
+      Locus-to-channel assignments follow the real NGM SElect kit (6-FAM=Blue, VIC=Green, NED=Yellow, PET=Red).
+      bp positions are illustrative spacing only, not calibrated instrument values. Control DNA 007 is a real,
+      published reference profile used in NGM SElect kit validation literature.
+    </p>
+    <h2 style="margin-top:16px;">Import / export a dataset</h2>
+    <div class="row">
+      <div class="field">
+        <label for="importFile">Import a profile or profile-library JSON file</label>
+        <input type="file" id="importFile" accept="application/json" onchange="handleImportFile(this)">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn-ghost" onclick="exportCurrentProfile()">Export current profile as JSON</button>
+      </div>
+    </div>
+    <div id="importLibraryPicker"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Loci</h2>
+    <div class="legend" id="legend"></div>
+    <div id="lociContainer"></div>
+    <button class="btn-navy" onclick="addLocus()">+ Add locus</button>
+  </div>
+
+  <div class="panel">
+    <h2>Preview</h2>
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="empty-msg">Add a locus above, or load a quick-start example, to see the EPG appear here.</div>
+    </div>
+    <div class="footer-row">
+      <span class="note">Rendering updates automatically as you type.</span>
+      <button class="btn-amber" onclick="downloadPNG()">Download PNG</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CHANNELS = [
+  { key: "Blue",   color: "#1F5FA8", order: 0 },
+  { key: "Green",  color: "#2E8B3D", order: 1 },
+  { key: "Yellow", color: "#B8960C", order: 2 },
+  { key: "Red",    color: "#C0392B", order: 3 },
+  { key: "Purple", color: "#7B4397", order: 4 },
+];
+const TYPES = ["True allele", "Stutter", "Pull-up / spectral", "Spike / blob", "Drop-in"];
+
+// NGM SElect dye-channel assignments verified against the official Thermo Fisher
+// AmpFlSTR NGM SElect Express product insert (6-FAM=Blue, VIC=Green, NED=Yellow,
+// PET=Red). bp ranges are illustrative spacing only, not calibrated size-standard
+// values. "CUSTOM" lets you name any locus outside this kit.
+// bpMin/bpMax match the ranges used to build the bundled example dataset
+// (see generate_dataset.py) -- illustrative spacing, not calibrated values.
+const NGM_SELECT_LOCI = [
+  { name: "D10S1248",  channel: "Blue",   bpMin: 80,  bpMax: 125 },
+  { name: "vWA",       channel: "Blue",   bpMin: 140, bpMax: 200 },
+  { name: "D16S539",   channel: "Blue",   bpMin: 215, bpMax: 255 },
+  { name: "D2S1338",   channel: "Blue",   bpMin: 270, bpMax: 340 },
+  { name: "Amelogenin",channel: "Green",  bpMin: 95,  bpMax: 106 },
+  { name: "D8S1179",   channel: "Green",  bpMin: 125, bpMax: 170 },
+  { name: "D21S11",    channel: "Green",  bpMin: 185, bpMax: 240 },
+  { name: "D18S51",    channel: "Green",  bpMin: 265, bpMax: 345 },
+  { name: "D22S1045",  channel: "Yellow", bpMin: 85,  bpMax: 120 },
+  { name: "D19S433",   channel: "Yellow", bpMin: 130, bpMax: 170 },
+  { name: "TH01",      channel: "Yellow", bpMin: 180, bpMax: 210 },
+  { name: "FGA",       channel: "Yellow", bpMin: 225, bpMax: 350 },
+  { name: "D2S441",    channel: "Red",    bpMin: 80,  bpMax: 110 },
+  { name: "D3S1358",   channel: "Red",    bpMin: 120, bpMax: 150 },
+  { name: "D1S1656",   channel: "Red",    bpMin: 165, bpMax: 210 },
+  { name: "D12S391",   channel: "Red",    bpMin: 220, bpMax: 270 },
+  { name: "SE33",      channel: "Red",    bpMin: 285, bpMax: 450 },
+];
+const CUSTOM_OPTION = "\u2014 Custom / other locus \u2014";
+
+// Built-in verified example dataset (see generate_dataset.py for provenance).
+const BUILT_IN_LIBRARY = {"library": [{"label": "Full single-source profile (Control DNA 007)", "sampleName": "Control DNA 007 \u2014 full single-source profile (NGM SElect, 17 markers)", "threshold": 50, "peakWidth": 0.6, "loci": [{"name": "D10S1248", "channel": "Blue", "alleles": [{"label": "12", "size": 98.0, "height": 800, "type": "True allele"}, {"label": "15", "size": 111.5, "height": 800, "type": "True allele"}]}, {"name": "vWA", "channel": "Blue", "alleles": [{"label": "14", "size": 153.8, "height": 800, "type": "True allele"}, {"label": "16", "size": 163.1, "height": 800, "type": "True allele"}]}, {"name": "D16S539", "channel": "Blue", "alleles": [{"label": "9", "size": 231.0, "height": 800, "type": "True allele"}, {"label": "10", "size": 235.0, "height": 800, "type": "True allele"}]}, {"name": "D2S1338", "channel": "Blue", "alleles": [{"label": "20", "size": 296.9, "height": 800, "type": "True allele"}, {"label": "23", "size": 313.1, "height": 800, "type": "True allele"}]}, {"name": "Amelogenin", "channel": "Green", "alleles": [{"label": "X", "size": 98.0, "height": 800, "type": "True allele"}, {"label": "Y", "size": 104.0, "height": 800, "type": "True allele"}]}, {"name": "D8S1179", "channel": "Green", "alleles": [{"label": "12", "size": 141.4, "height": 800, "type": "True allele"}, {"label": "13", "size": 145.5, "height": 800, "type": "True allele"}]}, {"name": "D21S11", "channel": "Green", "alleles": [{"label": "28", "size": 200.7, "height": 800, "type": "True allele"}, {"label": "31", "size": 212.5, "height": 800, "type": "True allele"}]}, {"name": "D18S51", "channel": "Green", "alleles": [{"label": "12", "size": 285.0, "height": 800, "type": "True allele"}, {"label": "15", "size": 297.0, "height": 800, "type": "True allele"}]}, {"name": "D22S1045", "channel": "Yellow", "alleles": [{"label": "11", "size": 94.5, "height": 800, "type": "True allele"}, {"label": "16", "size": 110.5, "height": 800, "type": "True allele"}]}, {"name": "D19S433", "channel": "Yellow", "alleles": [{"label": "14", "size": 155.0, "height": 800, "type": "True allele"}, {"label": "15", "size": 160.0, "height": 800, "type": "True allele"}]}, {"name": "TH01", "channel": "Yellow", "alleles": [{"label": "7", "size": 190.0, "height": 800, "type": "True allele"}, {"label": "9.3", "size": 197.7, "height": 800, "type": "True allele"}]}, {"name": "FGA", "channel": "Yellow", "alleles": [{"label": "24", "size": 250.7, "height": 800, "type": "True allele"}, {"label": "26", "size": 258.1, "height": 800, "type": "True allele"}]}, {"name": "D2S441", "channel": "Red", "alleles": [{"label": "14", "size": 101.4, "height": 800, "type": "True allele"}, {"label": "15", "size": 105.7, "height": 800, "type": "True allele"}]}, {"name": "D3S1358", "channel": "Red", "alleles": [{"label": "15", "size": 132.9, "height": 800, "type": "True allele"}, {"label": "16", "size": 137.1, "height": 800, "type": "True allele"}]}, {"name": "D1S1656", "channel": "Red", "alleles": [{"label": "13", "size": 181.4, "height": 800, "type": "True allele"}, {"label": "16", "size": 193.6, "height": 800, "type": "True allele"}]}, {"name": "D12S391", "channel": "Red", "alleles": [{"label": "18", "size": 235.4, "height": 800, "type": "True allele"}, {"label": "19", "size": 239.2, "height": 800, "type": "True allele"}]}, {"name": "SE33", "channel": "Red", "alleles": [{"label": "17", "size": 350.0, "height": 800, "type": "True allele"}, {"label": "25.2", "size": 391.0, "height": 800, "type": "True allele"}]}]}, {"label": "Partial / degraded profile (ski-slope, same donor as Control DNA 007)", "sampleName": "Degraded sample \u2014 partial profile (same donor as Control DNA 007)", "threshold": 50, "peakWidth": 0.6, "loci": [{"name": "D2S441", "channel": "Red", "alleles": [{"label": "14", "size": 101.4, "height": 900, "type": "True allele"}, {"label": "15", "size": 105.7, "height": 900, "type": "True allele"}]}, {"name": "Amelogenin", "channel": "Green", "alleles": [{"label": "X", "size": 98.0, "height": 845, "type": "True allele"}, {"label": "Y", "size": 104.0, "height": 845, "type": "True allele"}]}, {"name": "D10S1248", "channel": "Blue", "alleles": [{"label": "12", "size": 98.0, "height": 791, "type": "True allele"}, {"label": "15", "size": 111.5, "height": 791, "type": "True allele"}]}, {"name": "D22S1045", "channel": "Yellow", "alleles": [{"label": "11", "size": 94.5, "height": 736, "type": "True allele"}, {"label": "16", "size": 110.5, "height": 736, "type": "True allele"}]}, {"name": "D3S1358", "channel": "Red", "alleles": [{"label": "15", "size": 132.9, "height": 682, "type": "True allele"}, {"label": "16", "size": 137.1, "height": 682, "type": "True allele"}]}, {"name": "D8S1179", "channel": "Green", "alleles": [{"label": "12", "size": 141.4, "height": 627, "type": "True allele"}, {"label": "13", "size": 145.5, "height": 627, "type": "True allele"}]}, {"name": "D19S433", "channel": "Yellow", "alleles": [{"label": "14", "size": 155.0, "height": 573, "type": "True allele"}, {"label": "15", "size": 160.0, "height": 573, "type": "True allele"}]}, {"name": "vWA", "channel": "Blue", "alleles": [{"label": "14", "size": 153.8, "height": 518, "type": "True allele"}, {"label": "16", "size": 163.1, "height": 518, "type": "True allele"}]}, {"name": "D1S1656", "channel": "Red", "alleles": [{"label": "13", "size": 181.4, "height": 464, "type": "True allele"}, {"label": "16", "size": 193.6, "height": 464, "type": "True allele"}]}, {"name": "TH01", "channel": "Yellow", "alleles": [{"label": "7", "size": 190.0, "height": 409, "type": "True allele"}, {"label": "9.3", "size": 197.7, "height": 409, "type": "True allele"}]}, {"name": "D21S11", "channel": "Green", "alleles": [{"label": "28", "size": 200.7, "height": 354, "type": "True allele"}, {"label": "31", "size": 212.5, "height": 354, "type": "True allele"}]}, {"name": "D16S539", "channel": "Blue", "alleles": [{"label": "9", "size": 231.0, "height": 300, "type": "True allele"}, {"label": "10", "size": 235.0, "height": 300, "type": "True allele"}]}, {"name": "D12S391", "channel": "Red", "alleles": [{"label": "18", "size": 235.4, "height": 245, "type": "True allele"}, {"label": "19", "size": 239.2, "height": 245, "type": "True allele"}]}, {"name": "FGA", "channel": "Yellow", "alleles": [{"label": "24", "size": 250.7, "height": 191, "type": "True allele"}, {"label": "26", "size": 258.1, "height": 191, "type": "True allele"}]}, {"name": "D2S1338", "channel": "Blue", "alleles": [{"label": "20", "size": 296.9, "height": 136, "type": "True allele"}, {"label": "23", "size": 313.1, "height": 136, "type": "True allele"}]}, {"name": "D18S51", "channel": "Green", "alleles": [{"label": "15", "size": 297.0, "height": 82, "type": "True allele"}]}, {"name": "SE33", "channel": "Red", "alleles": [{"label": "25.2", "size": 391.0, "height": 27, "type": "True allele"}]}]}, {"label": "2-person mixture (3:1, clear major:minor)", "sampleName": "2-person mixture (75:25)", "threshold": 50, "peakWidth": 0.6, "loci": [{"name": "D10S1248", "channel": "Blue", "alleles": [{"label": "9", "size": 84.5, "height": 200, "type": "True allele"}, {"label": "12", "size": 98.0, "height": 600, "type": "True allele"}, {"label": "15", "size": 111.5, "height": 600, "type": "True allele"}, {"label": "18", "size": 125.0, "height": 200, "type": "True allele"}]}, {"name": "vWA", "channel": "Blue", "alleles": [{"label": "11", "size": 140.0, "height": 200, "type": "True allele"}, {"label": "14", "size": 153.8, "height": 600, "type": "True allele"}, {"label": "16", "size": 163.1, "height": 600, "type": "True allele"}, {"label": "22", "size": 190.8, "height": 200, "type": "True allele"}]}, {"name": "D16S539", "channel": "Blue", "alleles": [{"label": "8", "size": 227.0, "height": 200, "type": "True allele"}, {"label": "9", "size": 231.0, "height": 800, "type": "True allele"}, {"label": "10", "size": 235.0, "height": 600, "type": "True allele"}]}, {"name": "D2S1338", "channel": "Blue", "alleles": [{"label": "17", "size": 280.8, "height": 200, "type": "True allele"}, {"label": "18", "size": 286.2, "height": 200, "type": "True allele"}, {"label": "20", "size": 296.9, "height": 600, "type": "True allele"}, {"label": "23", "size": 313.1, "height": 600, "type": "True allele"}]}, {"name": "Amelogenin", "channel": "Green", "alleles": [{"label": "X", "size": 98.0, "height": 800, "type": "True allele"}, {"label": "Y", "size": 104.0, "height": 800, "type": "True allele"}]}, {"name": "D8S1179", "channel": "Green", "alleles": [{"label": "9", "size": 129.1, "height": 200, "type": "True allele"}, {"label": "12", "size": 141.4, "height": 600, "type": "True allele"}, {"label": "13", "size": 145.5, "height": 600, "type": "True allele"}, {"label": "19", "size": 170.0, "height": 200, "type": "True allele"}]}, {"name": "D21S11", "channel": "Green", "alleles": [{"label": "28", "size": 200.7, "height": 600, "type": "True allele"}, {"label": "31", "size": 212.5, "height": 600, "type": "True allele"}, {"label": "34", "size": 224.3, "height": 200, "type": "True allele"}, {"label": "35", "size": 228.2, "height": 200, "type": "True allele"}]}, {"name": "D18S51", "channel": "Green", "alleles": [{"label": "9", "size": 273.0, "height": 200, "type": "True allele"}, {"label": "12", "size": 285.0, "height": 600, "type": "True allele"}, {"label": "15", "size": 297.0, "height": 600, "type": "True allele"}, {"label": "24", "size": 333.0, "height": 200, "type": "True allele"}]}, {"name": "D22S1045", "channel": "Yellow", "alleles": [{"label": "11", "size": 94.5, "height": 600, "type": "True allele"}, {"label": "14", "size": 104.1, "height": 200, "type": "True allele"}, {"label": "16", "size": 110.5, "height": 600, "type": "True allele"}, {"label": "17", "size": 113.6, "height": 200, "type": "True allele"}]}, {"name": "D19S433", "channel": "Yellow", "alleles": [{"label": "9", "size": 130.0, "height": 400, "type": "True allele"}, {"label": "14", "size": 155.0, "height": 600, "type": "True allele"}, {"label": "15", "size": 160.0, "height": 600, "type": "True allele"}]}, {"name": "TH01", "channel": "Yellow", "alleles": [{"label": "5", "size": 183.3, "height": 200, "type": "True allele"}, {"label": "7", "size": 190.0, "height": 800, "type": "True allele"}, {"label": "9.3", "size": 197.7, "height": 600, "type": "True allele"}]}, {"name": "FGA", "channel": "Yellow", "alleles": [{"label": "24", "size": 250.7, "height": 600, "type": "True allele"}, {"label": "26", "size": 258.1, "height": 600, "type": "True allele"}, {"label": "31", "size": 276.5, "height": 200, "type": "True allele"}, {"label": "49", "size": 342.6, "height": 200, "type": "True allele"}]}, {"name": "D2S441", "channel": "Red", "alleles": [{"label": "9", "size": 80.0, "height": 200, "type": "True allele"}, {"label": "12", "size": 92.9, "height": 200, "type": "True allele"}, {"label": "14", "size": 101.4, "height": 600, "type": "True allele"}, {"label": "15", "size": 105.7, "height": 600, "type": "True allele"}]}, {"name": "D3S1358", "channel": "Red", "alleles": [{"label": "15", "size": 132.9, "height": 800, "type": "True allele"}, {"label": "16", "size": 137.1, "height": 600, "type": "True allele"}, {"label": "18", "size": 145.7, "height": 200, "type": "True allele"}]}, {"name": "D1S1656", "channel": "Red", "alleles": [{"label": "13", "size": 181.4, "height": 600, "type": "True allele"}, {"label": "16", "size": 193.6, "height": 800, "type": "True allele"}, {"label": "18", "size": 201.8, "height": 200, "type": "True allele"}]}, {"name": "D12S391", "channel": "Red", "alleles": [{"label": "18", "size": 235.4, "height": 800, "type": "True allele"}, {"label": "19", "size": 239.2, "height": 600, "type": "True allele"}, {"label": "26", "size": 266.2, "height": 200, "type": "True allele"}]}, {"name": "SE33", "channel": "Red", "alleles": [{"label": "4", "size": 285.0, "height": 200, "type": "True allele"}, {"label": "14", "size": 335.0, "height": 200, "type": "True allele"}, {"label": "17", "size": 350.0, "height": 600, "type": "True allele"}, {"label": "25.2", "size": 391.0, "height": 600, "type": "True allele"}]}]}, {"label": "3-person mixture (55:30:15)", "sampleName": "3-person mixture (55:30:15)", "threshold": 50, "peakWidth": 0.6, "loci": [{"name": "D10S1248", "channel": "Blue", "alleles": [{"label": "9", "size": 84.5, "height": 120, "type": "True allele"}, {"label": "12", "size": 98.0, "height": 440, "type": "True allele"}, {"label": "13", "size": 102.5, "height": 240, "type": "True allele"}, {"label": "14", "size": 107.0, "height": 360, "type": "True allele"}, {"label": "15", "size": 111.5, "height": 440, "type": "True allele"}]}, {"name": "vWA", "channel": "Blue", "alleles": [{"label": "13", "size": 149.2, "height": 240, "type": "True allele"}, {"label": "14", "size": 153.8, "height": 440, "type": "True allele"}, {"label": "15", "size": 158.5, "height": 360, "type": "True allele"}, {"label": "16", "size": 163.1, "height": 440, "type": "True allele"}, {"label": "18", "size": 172.3, "height": 120, "type": "True allele"}]}, {"name": "D16S539", "channel": "Blue", "alleles": [{"label": "8", "size": 227.0, "height": 240, "type": "True allele"}, {"label": "9", "size": 231.0, "height": 440, "type": "True allele"}, {"label": "10", "size": 235.0, "height": 800, "type": "True allele"}, {"label": "15", "size": 255.0, "height": 120, "type": "True allele"}]}, {"name": "D2S1338", "channel": "Blue", "alleles": [{"label": "16", "size": 275.4, "height": 480, "type": "True allele"}, {"label": "17", "size": 280.8, "height": 120, "type": "True allele"}, {"label": "20", "size": 296.9, "height": 560, "type": "True allele"}, {"label": "23", "size": 313.1, "height": 440, "type": "True allele"}]}, {"name": "Amelogenin", "channel": "Green", "alleles": [{"label": "X", "size": 98.0, "height": 800, "type": "True allele"}, {"label": "Y", "size": 104.0, "height": 800, "type": "True allele"}]}, {"name": "D8S1179", "channel": "Green", "alleles": [{"label": "9", "size": 129.1, "height": 240, "type": "True allele"}, {"label": "11", "size": 137.3, "height": 120, "type": "True allele"}, {"label": "12", "size": 141.4, "height": 440, "type": "True allele"}, {"label": "13", "size": 145.5, "height": 560, "type": "True allele"}, {"label": "14", "size": 149.5, "height": 240, "type": "True allele"}]}, {"name": "D21S11", "channel": "Green", "alleles": [{"label": "28", "size": 200.7, "height": 560, "type": "True allele"}, {"label": "29", "size": 204.6, "height": 240, "type": "True allele"}, {"label": "31", "size": 212.5, "height": 440, "type": "True allele"}, {"label": "34", "size": 224.3, "height": 120, "type": "True allele"}, {"label": "37", "size": 236.1, "height": 240, "type": "True allele"}]}, {"name": "D18S51", "channel": "Green", "alleles": [{"label": "9", "size": 273.0, "height": 120, "type": "True allele"}, {"label": "12", "size": 285.0, "height": 440, "type": "True allele"}, {"label": "15", "size": 297.0, "height": 440, "type": "True allele"}, {"label": "18", "size": 309.0, "height": 240, "type": "True allele"}, {"label": "26", "size": 341.0, "height": 240, "type": "True allele"}, {"label": "27", "size": 345.0, "height": 120, "type": "True allele"}]}, {"name": "D22S1045", "channel": "Yellow", "alleles": [{"label": "8", "size": 85.0, "height": 240, "type": "True allele"}, {"label": "11", "size": 94.5, "height": 440, "type": "True allele"}, {"label": "12", "size": 97.7, "height": 240, "type": "True allele"}, {"label": "16", "size": 110.5, "height": 440, "type": "True allele"}, {"label": "17", "size": 113.6, "height": 120, "type": "True allele"}, {"label": "18", "size": 116.8, "height": 120, "type": "True allele"}]}, {"name": "D19S433", "channel": "Yellow", "alleles": [{"label": "11", "size": 140.0, "height": 120, "type": "True allele"}, {"label": "14", "size": 155.0, "height": 440, "type": "True allele"}, {"label": "15", "size": 160.0, "height": 440, "type": "True allele"}, {"label": "16", "size": 165.0, "height": 240, "type": "True allele"}, {"label": "17", "size": 170.0, "height": 360, "type": "True allele"}]}, {"name": "TH01", "channel": "Yellow", "alleles": [{"label": "5", "size": 183.3, "height": 240, "type": "True allele"}, {"label": "6", "size": 186.7, "height": 120, "type": "True allele"}, {"label": "7", "size": 190.0, "height": 560, "type": "True allele"}, {"label": "9.3", "size": 197.7, "height": 440, "type": "True allele"}, {"label": "10", "size": 200.0, "height": 240, "type": "True allele"}]}, {"name": "FGA", "channel": "Yellow", "alleles": [{"label": "22", "size": 243.4, "height": 240, "type": "True allele"}, {"label": "24", "size": 250.7, "height": 440, "type": "True allele"}, {"label": "26", "size": 258.1, "height": 440, "type": "True allele"}, {"label": "35", "size": 291.2, "height": 240, "type": "True allele"}, {"label": "41", "size": 313.2, "height": 120, "type": "True allele"}, {"label": "46", "size": 331.6, "height": 120, "type": "True allele"}]}, {"name": "D2S441", "channel": "Red", "alleles": [{"label": "12", "size": 92.9, "height": 360, "type": "True allele"}, {"label": "13", "size": 97.1, "height": 120, "type": "True allele"}, {"label": "14", "size": 101.4, "height": 680, "type": "True allele"}, {"label": "15", "size": 105.7, "height": 440, "type": "True allele"}]}, {"name": "D3S1358", "channel": "Red", "alleles": [{"label": "12", "size": 120.0, "height": 360, "type": "True allele"}, {"label": "13", "size": 124.3, "height": 240, "type": "True allele"}, {"label": "15", "size": 132.9, "height": 440, "type": "True allele"}, {"label": "16", "size": 137.1, "height": 440, "type": "True allele"}, {"label": "17", "size": 141.4, "height": 120, "type": "True allele"}]}, {"name": "D1S1656", "channel": "Red", "alleles": [{"label": "9", "size": 165.0, "height": 120, "type": "True allele"}, {"label": "12", "size": 177.3, "height": 360, "type": "True allele"}, {"label": "13", "size": 181.4, "height": 440, "type": "True allele"}, {"label": "16", "size": 193.6, "height": 440, "type": "True allele"}, {"label": "19", "size": 205.9, "height": 240, "type": "True allele"}]}, {"name": "D12S391", "channel": "Red", "alleles": [{"label": "18", "size": 235.4, "height": 680, "type": "True allele"}, {"label": "19", "size": 239.2, "height": 560, "type": "True allele"}, {"label": "26", "size": 266.2, "height": 360, "type": "True allele"}]}, {"name": "SE33", "channel": "Red", "alleles": [{"label": "9", "size": 310.0, "height": 240, "type": "True allele"}, {"label": "17", "size": 350.0, "height": 440, "type": "True allele"}, {"label": "18", "size": 355.0, "height": 240, "type": "True allele"}, {"label": "21", "size": 370.0, "height": 120, "type": "True allele"}, {"label": "25.2", "size": 391.0, "height": 440, "type": "True allele"}, {"label": "29", "size": 410.0, "height": 120, "type": "True allele"}]}]}, {"label": "4-person mixture (40:30:20:10)", "sampleName": "4-person mixture (40:30:20:10)", "threshold": 50, "peakWidth": 0.6, "loci": [{"name": "D10S1248", "channel": "Blue", "alleles": [{"label": "9", "size": 84.5, "height": 240, "type": "True allele"}, {"label": "11", "size": 93.5, "height": 320, "type": "True allele"}, {"label": "12", "size": 98.0, "height": 320, "type": "True allele"}, {"label": "14", "size": 107.0, "height": 160, "type": "True allele"}, {"label": "15", "size": 111.5, "height": 320, "type": "True allele"}, {"label": "17", "size": 120.5, "height": 80, "type": "True allele"}, {"label": "18", "size": 125.0, "height": 160, "type": "True allele"}]}, {"name": "vWA", "channel": "Blue", "alleles": [{"label": "12", "size": 144.6, "height": 160, "type": "True allele"}, {"label": "13", "size": 149.2, "height": 80, "type": "True allele"}, {"label": "14", "size": 153.8, "height": 320, "type": "True allele"}, {"label": "16", "size": 163.1, "height": 400, "type": "True allele"}, {"label": "20", "size": 181.5, "height": 400, "type": "True allele"}, {"label": "22", "size": 190.8, "height": 240, "type": "True allele"}]}, {"name": "D16S539", "channel": "Blue", "alleles": [{"label": "7", "size": 223.0, "height": 80, "type": "True allele"}, {"label": "8", "size": 227.0, "height": 240, "type": "True allele"}, {"label": "9", "size": 231.0, "height": 320, "type": "True allele"}, {"label": "10", "size": 235.0, "height": 560, "type": "True allele"}, {"label": "11", "size": 239.0, "height": 320, "type": "True allele"}, {"label": "13", "size": 247.0, "height": 80, "type": "True allele"}]}, {"name": "D2S1338", "channel": "Blue", "alleles": [{"label": "20", "size": 296.9, "height": 320, "type": "True allele"}, {"label": "22", "size": 307.7, "height": 400, "type": "True allele"}, {"label": "23", "size": 313.1, "height": 400, "type": "True allele"}, {"label": "24", "size": 318.5, "height": 160, "type": "True allele"}, {"label": "25", "size": 323.8, "height": 240, "type": "True allele"}, {"label": "27", "size": 334.6, "height": 80, "type": "True allele"}]}, {"name": "Amelogenin", "channel": "Green", "alleles": [{"label": "X", "size": 98.0, "height": 800, "type": "True allele"}, {"label": "Y", "size": 104.0, "height": 800, "type": "True allele"}]}, {"name": "D8S1179", "channel": "Green", "alleles": [{"label": "8", "size": 125.0, "height": 80, "type": "True allele"}, {"label": "12", "size": 141.4, "height": 480, "type": "True allele"}, {"label": "13", "size": 145.5, "height": 320, "type": "True allele"}, {"label": "14", "size": 149.5, "height": 240, "type": "True allele"}, {"label": "16", "size": 157.7, "height": 160, "type": "True allele"}, {"label": "17", "size": 161.8, "height": 80, "type": "True allele"}, {"label": "18", "size": 165.9, "height": 240, "type": "True allele"}]}, {"name": "D21S11", "channel": "Green", "alleles": [{"label": "26", "size": 192.9, "height": 240, "type": "True allele"}, {"label": "28", "size": 200.7, "height": 320, "type": "True allele"}, {"label": "29", "size": 204.6, "height": 80, "type": "True allele"}, {"label": "31", "size": 212.5, "height": 640, "type": "True allele"}, {"label": "32", "size": 216.4, "height": 160, "type": "True allele"}, {"label": "37", "size": 236.1, "height": 160, "type": "True allele"}]}, {"name": "D18S51", "channel": "Green", "alleles": [{"label": "7", "size": 265.0, "height": 240, "type": "True allele"}, {"label": "10", "size": 277.0, "height": 240, "type": "True allele"}, {"label": "11", "size": 281.0, "height": 240, "type": "True allele"}, {"label": "12", "size": 285.0, "height": 320, "type": "True allele"}, {"label": "15", "size": 297.0, "height": 560, "type": "True allele"}]}, {"name": "D22S1045", "channel": "Yellow", "alleles": [{"label": "11", "size": 94.5, "height": 560, "type": "True allele"}, {"label": "12", "size": 97.7, "height": 80, "type": "True allele"}, {"label": "13", "size": 100.9, "height": 80, "type": "True allele"}, {"label": "16", "size": 110.5, "height": 480, "type": "True allele"}, {"label": "18", "size": 116.8, "height": 160, "type": "True allele"}, {"label": "19", "size": 120.0, "height": 240, "type": "True allele"}]}, {"name": "D19S433", "channel": "Yellow", "alleles": [{"label": "9", "size": 130.0, "height": 80, "type": "True allele"}, {"label": "12", "size": 145.0, "height": 80, "type": "True allele"}, {"label": "13", "size": 150.0, "height": 160, "type": "True allele"}, {"label": "14", "size": 155.0, "height": 480, "type": "True allele"}, {"label": "15", "size": 160.0, "height": 320, "type": "True allele"}, {"label": "17", "size": 170.0, "height": 480, "type": "True allele"}]}, {"name": "TH01", "channel": "Yellow", "alleles": [{"label": "5", "size": 183.3, "height": 160, "type": "True allele"}, {"label": "7", "size": 190.0, "height": 400, "type": "True allele"}, {"label": "8", "size": 193.3, "height": 400, "type": "True allele"}, {"label": "9.3", "size": 197.7, "height": 320, "type": "True allele"}, {"label": "13", "size": 210.0, "height": 320, "type": "True allele"}]}, {"name": "FGA", "channel": "Yellow", "alleles": [{"label": "22", "size": 243.4, "height": 160, "type": "True allele"}, {"label": "24", "size": 250.7, "height": 320, "type": "True allele"}, {"label": "26", "size": 258.1, "height": 320, "type": "True allele"}, {"label": "27", "size": 261.8, "height": 160, "type": "True allele"}, {"label": "42", "size": 316.9, "height": 240, "type": "True allele"}, {"label": "44", "size": 324.3, "height": 400, "type": "True allele"}]}, {"name": "D2S441", "channel": "Red", "alleles": [{"label": "9", "size": 80.0, "height": 160, "type": "True allele"}, {"label": "10", "size": 84.3, "height": 80, "type": "True allele"}, {"label": "12", "size": 92.9, "height": 240, "type": "True allele"}, {"label": "14", "size": 101.4, "height": 560, "type": "True allele"}, {"label": "15", "size": 105.7, "height": 320, "type": "True allele"}, {"label": "16", "size": 110.0, "height": 240, "type": "True allele"}]}, {"name": "D3S1358", "channel": "Red", "alleles": [{"label": "14", "size": 128.6, "height": 560, "type": "True allele"}, {"label": "15", "size": 132.9, "height": 320, "type": "True allele"}, {"label": "16", "size": 137.1, "height": 480, "type": "True allele"}, {"label": "19", "size": 150.0, "height": 240, "type": "True allele"}]}, {"name": "D1S1656", "channel": "Red", "alleles": [{"label": "9", "size": 165.0, "height": 240, "type": "True allele"}, {"label": "10", "size": 169.1, "height": 400, "type": "True allele"}, {"label": "13", "size": 181.4, "height": 320, "type": "True allele"}, {"label": "16", "size": 193.6, "height": 400, "type": "True allele"}, {"label": "17", "size": 197.7, "height": 160, "type": "True allele"}, {"label": "19", "size": 205.9, "height": 80, "type": "True allele"}]}, {"name": "D12S391", "channel": "Red", "alleles": [{"label": "15", "size": 223.8, "height": 240, "type": "True allele"}, {"label": "16", "size": 227.7, "height": 80, "type": "True allele"}, {"label": "18", "size": 235.4, "height": 320, "type": "True allele"}, {"label": "19", "size": 239.2, "height": 320, "type": "True allele"}, {"label": "22", "size": 250.8, "height": 80, "type": "True allele"}, {"label": "24", "size": 258.5, "height": 160, "type": "True allele"}, {"label": "27", "size": 270.0, "height": 400, "type": "True allele"}]}, {"name": "SE33", "channel": "Red", "alleles": [{"label": "13", "size": 330.0, "height": 240, "type": "True allele"}, {"label": "14", "size": 335.0, "height": 240, "type": "True allele"}, {"label": "17", "size": 350.0, "height": 320, "type": "True allele"}, {"label": "20", "size": 365.0, "height": 80, "type": "True allele"}, {"label": "23", "size": 380.0, "height": 160, "type": "True allele"}, {"label": "25.2", "size": 391.0, "height": 320, "type": "True allele"}, {"label": "36", "size": 445.0, "height": 160, "type": "True allele"}, {"label": "37", "size": 450.0, "height": 80, "type": "True allele"}]}]}, {"label": "5-person mixture (35:25:20:12:8)", "sampleName": "5-person mixture (35:25:20:12:8)", "threshold": 50, "peakWidth": 0.6, "loci": [{"name": "D10S1248", "channel": "Blue", "alleles": [{"label": "11", "size": 93.5, "height": 352, "type": "True allele"}, {"label": "12", "size": 98.0, "height": 504, "type": "True allele"}, {"label": "14", "size": 107.0, "height": 200, "type": "True allele"}, {"label": "15", "size": 111.5, "height": 344, "type": "True allele"}, {"label": "17", "size": 120.5, "height": 200, "type": "True allele"}]}, {"name": "vWA", "channel": "Blue", "alleles": [{"label": "14", "size": 153.8, "height": 480, "type": "True allele"}, {"label": "15", "size": 158.5, "height": 64, "type": "True allele"}, {"label": "16", "size": 163.1, "height": 280, "type": "True allele"}, {"label": "17", "size": 167.7, "height": 64, "type": "True allele"}, {"label": "18", "size": 172.3, "height": 256, "type": "True allele"}, {"label": "19", "size": 176.9, "height": 296, "type": "True allele"}, {"label": "21", "size": 186.2, "height": 160, "type": "True allele"}]}, {"name": "D16S539", "channel": "Blue", "alleles": [{"label": "7", "size": 223.0, "height": 96, "type": "True allele"}, {"label": "8", "size": 227.0, "height": 360, "type": "True allele"}, {"label": "9", "size": 231.0, "height": 480, "type": "True allele"}, {"label": "10", "size": 235.0, "height": 280, "type": "True allele"}, {"label": "11", "size": 239.0, "height": 96, "type": "True allele"}, {"label": "13", "size": 247.0, "height": 224, "type": "True allele"}, {"label": "15", "size": 255.0, "height": 64, "type": "True allele"}]}, {"name": "D2S1338", "channel": "Blue", "alleles": [{"label": "17", "size": 280.8, "height": 256, "type": "True allele"}, {"label": "19", "size": 291.5, "height": 96, "type": "True allele"}, {"label": "20", "size": 296.9, "height": 280, "type": "True allele"}, {"label": "21", "size": 302.3, "height": 200, "type": "True allele"}, {"label": "22", "size": 307.7, "height": 64, "type": "True allele"}, {"label": "23", "size": 313.1, "height": 280, "type": "True allele"}, {"label": "25", "size": 323.8, "height": 200, "type": "True allele"}, {"label": "26", "size": 329.2, "height": 224, "type": "True allele"}]}, {"name": "Amelogenin", "channel": "Green", "alleles": [{"label": "X", "size": 98.0, "height": 800, "type": "True allele"}, {"label": "Y", "size": 104.0, "height": 800, "type": "True allele"}]}, {"name": "D8S1179", "channel": "Green", "alleles": [{"label": "10", "size": 133.2, "height": 64, "type": "True allele"}, {"label": "11", "size": 137.3, "height": 160, "type": "True allele"}, {"label": "12", "size": 141.4, "height": 280, "type": "True allele"}, {"label": "13", "size": 145.5, "height": 480, "type": "True allele"}, {"label": "15", "size": 153.6, "height": 96, "type": "True allele"}, {"label": "17", "size": 161.8, "height": 320, "type": "True allele"}, {"label": "18", "size": 165.9, "height": 200, "type": "True allele"}]}, {"name": "D21S11", "channel": "Green", "alleles": [{"label": "27", "size": 196.8, "height": 224, "type": "True allele"}, {"label": "28", "size": 200.7, "height": 344, "type": "True allele"}, {"label": "31", "size": 212.5, "height": 640, "type": "True allele"}, {"label": "37", "size": 236.1, "height": 96, "type": "True allele"}, {"label": "38", "size": 240.0, "height": 296, "type": "True allele"}]}, {"name": "D18S51", "channel": "Green", "alleles": [{"label": "8", "size": 269.0, "height": 64, "type": "True allele"}, {"label": "9", "size": 273.0, "height": 96, "type": "True allele"}, {"label": "12", "size": 285.0, "height": 280, "type": "True allele"}, {"label": "15", "size": 297.0, "height": 280, "type": "True allele"}, {"label": "20", "size": 317.0, "height": 160, "type": "True allele"}, {"label": "21", "size": 321.0, "height": 296, "type": "True allele"}, {"label": "22", "size": 325.0, "height": 160, "type": "True allele"}, {"label": "23", "size": 329.0, "height": 200, "type": "True allele"}, {"label": "25", "size": 337.0, "height": 64, "type": "True allele"}]}, {"name": "D22S1045", "channel": "Yellow", "alleles": [{"label": "9", "size": 88.2, "height": 456, "type": "True allele"}, {"label": "11", "size": 94.5, "height": 640, "type": "True allele"}, {"label": "16", "size": 110.5, "height": 440, "type": "True allele"}, {"label": "19", "size": 120.0, "height": 64, "type": "True allele"}]}, {"name": "D19S433", "channel": "Yellow", "alleles": [{"label": "9", "size": 130.0, "height": 160, "type": "True allele"}, {"label": "10", "size": 135.0, "height": 360, "type": "True allele"}, {"label": "12", "size": 145.0, "height": 200, "type": "True allele"}, {"label": "14", "size": 155.0, "height": 344, "type": "True allele"}, {"label": "15", "size": 160.0, "height": 440, "type": "True allele"}, {"label": "17", "size": 170.0, "height": 96, "type": "True allele"}]}, {"name": "TH01", "channel": "Yellow", "alleles": [{"label": "4", "size": 180.0, "height": 424, "type": "True allele"}, {"label": "5", "size": 183.3, "height": 96, "type": "True allele"}, {"label": "7", "size": 190.0, "height": 280, "type": "True allele"}, {"label": "9", "size": 196.7, "height": 360, "type": "True allele"}, {"label": "9.3", "size": 197.7, "height": 280, "type": "True allele"}, {"label": "10", "size": 200.0, "height": 160, "type": "True allele"}]}, {"name": "FGA", "channel": "Yellow", "alleles": [{"label": "24", "size": 250.7, "height": 280, "type": "True allele"}, {"label": "26", "size": 258.1, "height": 280, "type": "True allele"}, {"label": "27", "size": 261.8, "height": 96, "type": "True allele"}, {"label": "31", "size": 276.5, "height": 400, "type": "True allele"}, {"label": "32", "size": 280.1, "height": 96, "type": "True allele"}, {"label": "43", "size": 320.6, "height": 160, "type": "True allele"}, {"label": "46", "size": 331.6, "height": 160, "type": "True allele"}, {"label": "47", "size": 335.3, "height": 64, "type": "True allele"}, {"label": "49", "size": 342.6, "height": 64, "type": "True allele"}]}, {"name": "D2S441", "channel": "Red", "alleles": [{"label": "9", "size": 80.0, "height": 424, "type": "True allele"}, {"label": "10", "size": 84.3, "height": 360, "type": "True allele"}, {"label": "11", "size": 88.6, "height": 64, "type": "True allele"}, {"label": "14", "size": 101.4, "height": 280, "type": "True allele"}, {"label": "15", "size": 105.7, "height": 376, "type": "True allele"}, {"label": "16", "size": 110.0, "height": 96, "type": "True allele"}]}, {"name": "D3S1358", "channel": "Red", "alleles": [{"label": "12", "size": 120.0, "height": 360, "type": "True allele"}, {"label": "13", "size": 124.3, "height": 64, "type": "True allele"}, {"label": "14", "size": 128.6, "height": 64, "type": "True allele"}, {"label": "15", "size": 132.9, "height": 576, "type": "True allele"}, {"label": "16", "size": 137.1, "height": 280, "type": "True allele"}, {"label": "18", "size": 145.7, "height": 160, "type": "True allele"}, {"label": "19", "size": 150.0, "height": 96, "type": "True allele"}]}, {"name": "D1S1656", "channel": "Red", "alleles": [{"label": "9", "size": 165.0, "height": 296, "type": "True allele"}, {"label": "10", "size": 169.1, "height": 264, "type": "True allele"}, {"label": "13", "size": 181.4, "height": 280, "type": "True allele"}, {"label": "14", "size": 185.5, "height": 160, "type": "True allele"}, {"label": "15", "size": 189.5, "height": 96, "type": "True allele"}, {"label": "16", "size": 193.6, "height": 280, "type": "True allele"}, {"label": "18", "size": 201.8, "height": 64, "type": "True allele"}, {"label": "20", "size": 210.0, "height": 160, "type": "True allele"}]}, {"name": "D12S391", "channel": "Red", "alleles": [{"label": "15", "size": 223.8, "height": 64, "type": "True allele"}, {"label": "16", "size": 227.7, "height": 96, "type": "True allele"}, {"label": "18", "size": 235.4, "height": 280, "type": "True allele"}, {"label": "19", "size": 239.2, "height": 480, "type": "True allele"}, {"label": "20", "size": 243.1, "height": 96, "type": "True allele"}, {"label": "24", "size": 258.5, "height": 64, "type": "True allele"}, {"label": "26", "size": 266.2, "height": 160, "type": "True allele"}, {"label": "27", "size": 270.0, "height": 360, "type": "True allele"}]}, {"name": "SE33", "channel": "Red", "alleles": [{"label": "4", "size": 285.0, "height": 96, "type": "True allele"}, {"label": "8", "size": 305.0, "height": 200, "type": "True allele"}, {"label": "10", "size": 315.0, "height": 160, "type": "True allele"}, {"label": "17", "size": 350.0, "height": 280, "type": "True allele"}, {"label": "19", "size": 360.0, "height": 224, "type": "True allele"}, {"label": "25.2", "size": 391.0, "height": 280, "type": "True allele"}, {"label": "28", "size": 405.0, "height": 96, "type": "True allele"}, {"label": "29", "size": 410.0, "height": 64, "type": "True allele"}, {"label": "36", "size": 445.0, "height": 200, "type": "True allele"}]}]}]};
+
+let loci = [];
+let nextLocusId = 1;
+
+function uid(){ return nextLocusId++; }
+
+function newAllele(label, size, height, type){
+  return { label: label || "", size: size ?? 100, height: height ?? 500, type: type || "True allele" };
+}
+function newLocus(name, channel, alleles){
+  const known = NGM_SELECT_LOCI.find(l => l.name === name);
+  return {
+    id: uid(),
+    name: known ? name : CUSTOM_OPTION,
+    customName: (!known && name) ? name : "",
+    channel: channel || (known ? known.channel : "Blue"),
+    alleles: alleles || [newAllele()],
+  };
+}
+
+function renderLegend(){
+  const el = document.getElementById("legend");
+  el.innerHTML = CHANNELS.map(c =>
+    `<span><span class="dot" style="background:${c.color}"></span>${c.key}</span>`
+  ).join("");
+}
+
+function renderLociEditor(){
+  const container = document.getElementById("lociContainer");
+  container.innerHTML = "";
+  loci.forEach(locus => {
+    const card = document.createElement("div");
+    card.className = "locus-card";
+
+    const head = document.createElement("div");
+    head.className = "head";
+    const titleFields = document.createElement("div");
+    titleFields.className = "title-fields";
+
+    const isCustom = locus.name === CUSTOM_OPTION;
+    titleFields.innerHTML = `
+      <div class="field">
+        <label>Locus (NGM SElect)</label>
+        <select onchange="selectLocusName(${locus.id}, this.value)">
+          ${NGM_SELECT_LOCI.map(l => `<option value="${escapeHtml(l.name)}" ${l.name === locus.name ? "selected" : ""}>${escapeHtml(l.name)}</option>`).join("")}
+          <option value="${escapeHtml(CUSTOM_OPTION)}" ${isCustom ? "selected" : ""}>${escapeHtml(CUSTOM_OPTION)}</option>
+        </select>
+      </div>
+      ${isCustom ? `
+      <div class="field">
+        <label>Custom locus name</label>
+        <input type="text" class="name" value="${escapeHtml(locus.customName || "")}" placeholder="e.g. D5S818" onchange="updateLocus(${locus.id}, 'customName', this.value)">
+      </div>` : ""}
+      <div class="field">
+        <label>Dye channel</label>
+        <select onchange="updateLocus(${locus.id}, 'channel', this.value)">
+          ${CHANNELS.map(c => `<option value="${c.key}" ${c.key === locus.channel ? "selected" : ""}>${c.key}</option>`).join("")}
+        </select>
+      </div>
+    `;
+    head.appendChild(titleFields);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "btn-remove";
+    removeBtn.textContent = "Remove locus";
+    removeBtn.onclick = () => removeLocus(locus.id);
+    head.appendChild(removeBtn);
+
+    card.appendChild(head);
+
+    const table = document.createElement("table");
+    table.className = "alleles";
+    table.innerHTML = `
+      <thead><tr><th style="width:22%">Allele label</th><th style="width:20%">Size (bp)</th><th style="width:20%">Height (RFU)</th><th style="width:26%">Type</th><th style="width:12%"></th></tr></thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector("tbody");
+    locus.alleles.forEach((a, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input type="text" value="${escapeHtml(a.label)}" onchange="updateAllele(${locus.id}, ${i}, 'label', this.value)"></td>
+        <td><input type="number" step="0.1" value="${a.size}" onchange="updateAllele(${locus.id}, ${i}, 'size', parseFloat(this.value))"></td>
+        <td><input type="number" step="10" value="${a.height}" onchange="updateAllele(${locus.id}, ${i}, 'height', parseFloat(this.value))"></td>
+        <td><select onchange="updateAllele(${locus.id}, ${i}, 'type', this.value)">
+              ${TYPES.map(t => `<option ${t === a.type ? "selected" : ""}>${t}</option>`).join("")}
+            </select></td>
+        <td><button class="btn-remove btn-sm" onclick="removeAllele(${locus.id}, ${i})">\u2715</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    card.appendChild(table);
+
+    const addAlleleBtn = document.createElement("button");
+    addAlleleBtn.className = "btn-ghost btn-sm";
+    addAlleleBtn.style.marginTop = "8px";
+    addAlleleBtn.textContent = "+ Add allele";
+    addAlleleBtn.onclick = () => addAllele(locus.id);
+    card.appendChild(addAlleleBtn);
+
+    container.appendChild(card);
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function addLocus(){
+  loci.push(newLocus());
+  renderLociEditor();
+  renderEPG();
+}
+function removeLocus(id){
+  loci = loci.filter(l => l.id !== id);
+  renderLociEditor();
+  renderEPG();
+}
+function updateLocus(id, field, value){
+  const l = loci.find(l => l.id === id);
+  if (l) l[field] = value;
+  renderEPG();
+}
+function selectLocusName(id, value){
+  const l = loci.find(l => l.id === id);
+  if (!l) return;
+  l.name = value;
+  const known = NGM_SELECT_LOCI.find(x => x.name === value);
+  if (known){
+    l.channel = known.channel; // auto-set to the kit's real dye channel
+  }
+  renderLociEditor();
+  renderEPG();
+}
+function displayName(locus){
+  return locus.name === CUSTOM_OPTION ? (locus.customName || "Custom locus") : locus.name;
+}
+function addAllele(locusId){
+  const l = loci.find(l => l.id === locusId);
+  if (l) l.alleles.push(newAllele());
+  renderLociEditor();
+  renderEPG();
+}
+function removeAllele(locusId, idx){
+  const l = loci.find(l => l.id === locusId);
+  if (l) l.alleles.splice(idx, 1);
+  renderLociEditor();
+  renderEPG();
+}
+function updateAllele(locusId, idx, field, value){
+  const l = loci.find(l => l.id === locusId);
+  if (l && l.alleles[idx]) l.alleles[idx][field] = value;
+  renderEPG();
+}
+function clearAll(){
+  loci = [];
+  renderLociEditor();
+  renderEPG();
+}
+
+function applyProfileData(profile){
+  document.getElementById("sampleName").value = profile.sampleName || "Imported profile";
+  if (profile.threshold != null) document.getElementById("threshold").value = profile.threshold;
+  if (profile.peakWidth != null) document.getElementById("peakWidth").value = profile.peakWidth;
+  loci = (profile.loci || []).map(l =>
+    newLocus(l.name, l.channel, (l.alleles || []).map(a => newAllele(a.label, a.size, a.height, a.type)))
+  );
+  renderLociEditor();
+  renderEPG();
+}
+
+function loadLibraryProfile(index){
+  applyProfileData(BUILT_IN_LIBRARY.library[index]);
+}
+
+function renderLibraryButtons(){
+  const el = document.getElementById("libraryButtons");
+  el.innerHTML = BUILT_IN_LIBRARY.library.map((p, i) =>
+    `<button class="btn-teal btn-sm" onclick="loadLibraryProfile(${i})">Load: ${escapeHtml(p.label)}</button>`
+  ).join("");
+}
+
+function exportCurrentProfile(){
+  const profile = {
+    sampleName: document.getElementById("sampleName").value,
+    threshold: parseFloat(document.getElementById("threshold").value),
+    peakWidth: parseFloat(document.getElementById("peakWidth").value),
+    loci: loci.map(l => ({
+      name: displayName(l),
+      channel: l.channel,
+      alleles: l.alleles.map(a => ({ label: a.label, size: a.size, height: a.height, type: a.type })),
+    })),
+  };
+  const blob = new Blob([JSON.stringify(profile, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const safeName = (profile.sampleName || "profile").replace(/[^a-z0-9]+/gi, "_");
+  link.download = safeName + ".json";
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function handleImportFile(input){
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch (err){
+      alert("Could not read that file as JSON: " + err.message);
+      return;
+    }
+    const picker = document.getElementById("importLibraryPicker");
+    if (data.library && Array.isArray(data.library)){
+      picker.innerHTML = "<h2 style='margin-top:14px;'>Choose a profile from the imported file</h2>" +
+        "<div class='presets'>" +
+        data.library.map((p, i) =>
+          `<button class="btn-amber btn-sm" onclick='applyImportedLibraryProfile(${i})'>${escapeHtml(p.label || ("Profile " + (i+1)))}</button>`
+        ).join("") + "</div>";
+      window._importedLibrary = data.library;
+    } else if (data.loci) {
+      picker.innerHTML = "";
+      applyProfileData(data);
+    } else {
+      alert("This file doesn't look like a profile or profile-library export from this tool.");
+    }
+  };
+  reader.readAsText(file);
+}
+function applyImportedLibraryProfile(i){
+  applyProfileData(window._importedLibrary[i]);
+}
+
+// ---------------- Rendering ----------------
+
+function getLocusRange(l){
+  const known = NGM_SELECT_LOCI.find(x => x.name === displayName(l));
+  if (known) return { bpMin: known.bpMin, bpMax: known.bpMax };
+  const sizes = l.alleles.map(a => a.size);
+  return { bpMin: Math.min(...sizes) - 4, bpMax: Math.max(...sizes) + 4 };
+}
+
+function gaussianSum(x, peaks){
+  let y = 0;
+  for (const pk of peaks){
+    y += pk.height * Math.exp(-0.5 * Math.pow((x - pk.size) / pk.width, 2));
+  }
+  return y;
+}
+
+function renderEPG(){
+  const wrap = document.getElementById("canvasWrap");
+  const activeChannels = CHANNELS.filter(c => loci.some(l => l.channel === c.key && l.alleles.length > 0));
+
+  if (activeChannels.length === 0){
+    wrap.innerHTML = '<div class="empty-msg">Add a locus above, or load a quick-start example, to see the EPG appear here.</div>';
+    return;
+  }
+
+  let canvas = document.getElementById("epgCanvas");
+  if (!canvas){
+    canvas = document.createElement("canvas");
+    canvas.id = "epgCanvas";
+    wrap.innerHTML = "";
+    wrap.appendChild(canvas);
+  }
+
+  const threshold = parseFloat(document.getElementById("threshold").value) || 0;
+  const peakWidth = parseFloat(document.getElementById("peakWidth").value) || 0.3;
+  const sampleName = document.getElementById("sampleName").value;
+
+  const allSizes = [];
+  loci.forEach(l => l.alleles.forEach(a => allSizes.push(a.size)));
+  let xMin = Math.min(...allSizes) - 8;
+  let xMax = Math.max(...allSizes) + 8;
+  if (!isFinite(xMin) || !isFinite(xMax) || xMin === xMax){ xMin = 90; xMax = 110; }
+
+  const rowH = 190;
+  const rulerH = 36; // top band per row: locus bracket, name, and allele-position ticks
+  const topMargin = 46;
+  const leftMargin = 60;
+  const rightMargin = 20;
+  const bottomMargin = 34;
+  const plotW = 1180;
+  const canvasW = leftMargin + plotW + rightMargin;
+  const canvasH = topMargin + activeChannels.length * rowH + bottomMargin;
+
+  const scale = window.devicePixelRatio || 1;
+  canvas.width = canvasW * scale;
+  canvas.height = canvasH * scale;
+  canvas.style.height = canvasH + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.clearRect(0, 0, canvasW, canvasH);
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  ctx.fillStyle = "#1F3864";
+  ctx.font = "bold 15px Arial";
+  ctx.fillText(sampleName, leftMargin, 22);
+
+  const xToPx = (x) => leftMargin + ((x - xMin) / (xMax - xMin)) * plotW;
+
+  activeChannels.forEach((channel, rowIdx) => {
+    const rowTop = topMargin + rowIdx * rowH;
+    const rulerBottom = rowTop + rulerH;
+    const rowBottom = rowTop + rowH - 14;
+    const channelLoci = loci.filter(l => l.channel === channel.key && l.alleles.length > 0);
+    const peaks = [];
+    channelLoci.forEach(l => l.alleles.forEach(a => peaks.push({ size: a.size, height: a.height, width: peakWidth, label: a.label, type: a.type })));
+
+    const plotH = rowBottom - rulerBottom;
+    const maxH = Math.max(threshold * 1.4, ...peaks.map(p => p.height * 1.35), 100);
+    const yToPx = (y) => rowBottom - (y / maxH) * (plotH - 10);
+
+    // --- Locus ruler band: a bracket spanning each locus's size range, its name,
+    // and small tick marks + labels at each allele position -- modelled on the
+    // panel/bin display in GeneMapper HD / ID-X, so adjacent loci in the same dye
+    // channel are clearly delimited from one another.
+    channelLoci.forEach(l => {
+      const range = getLocusRange(l);
+      const xStart = xToPx(range.bpMin);
+      const xEnd = xToPx(range.bpMax);
+      const midX = (xStart + xEnd) / 2;
+      const bracketY = rulerBottom - 6;
+
+      // locus name
+      ctx.fillStyle = "#22252B";
+      ctx.font = "bold 10px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(displayName(l), midX, rowTop + 9);
+
+      // allele-position tick labels (small, muted)
+      ctx.font = "7.5px Arial";
+      ctx.fillStyle = "#8a8272";
+      l.alleles.forEach(a => {
+        ctx.fillText(a.label, xToPx(a.size), rowTop + 20);
+      });
+
+      // bracket line with end-caps and a tick at each allele position
+      ctx.strokeStyle = channel.color;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(xStart, bracketY);
+      ctx.lineTo(xEnd, bracketY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(xStart, bracketY - 4); ctx.lineTo(xStart, bracketY + 4);
+      ctx.moveTo(xEnd, bracketY - 4); ctx.lineTo(xEnd, bracketY + 4);
+      l.alleles.forEach(a => {
+        const tx = xToPx(a.size);
+        ctx.moveTo(tx, bracketY - 3); ctx.lineTo(tx, bracketY + 3);
+      });
+      ctx.stroke();
+    });
+    ctx.textAlign = "left";
+
+    // channel indicator: a small colour dot + label in the left gutter, vertically
+    // centred on this row's PLOT area (below the ruler band) -- kept clear of the
+    // ruler and of neighbouring rows.
+    const dotY = rulerBottom + plotH / 2;
+    ctx.beginPath();
+    ctx.fillStyle = channel.color;
+    ctx.arc(10, dotY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(24, dotY);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = channel.color;
+    ctx.font = "bold 10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(channel.key, 0, 0);
+    ctx.restore();
+    ctx.textAlign = "left";
+
+    // baseline
+    ctx.strokeStyle = "#D9D3C4";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(leftMargin, rowBottom);
+    ctx.lineTo(leftMargin + plotW, rowBottom);
+    ctx.stroke();
+
+    // threshold line
+    const thY = yToPx(threshold);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = "#B25E09";
+    ctx.beginPath();
+    ctx.moveTo(leftMargin, thY);
+    ctx.lineTo(leftMargin + plotW, thY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // trace curve (sum of gaussians across this channel)
+    ctx.beginPath();
+    ctx.strokeStyle = channel.color;
+    ctx.lineWidth = 1.6;
+    const steps = 400;
+    let started = false;
+    const points = [];
+    for (let i = 0; i <= steps; i++){
+      const x = xMin + (i / steps) * (xMax - xMin);
+      const y = gaussianSum(x, peaks);
+      points.push([x, y]);
+    }
+    ctx.moveTo(xToPx(points[0][0]), yToPx(points[0][1]));
+    for (const [x, y] of points) ctx.lineTo(xToPx(x), yToPx(y));
+    ctx.stroke();
+
+    // fill under curve
+    ctx.lineTo(xToPx(points[points.length - 1][0]), rowBottom);
+    ctx.lineTo(xToPx(points[0][0]), rowBottom);
+    ctx.closePath();
+    ctx.fillStyle = channel.color + "33";
+    ctx.fill();
+
+    // peak labels: allele call above the peak, with the peak height (RFU)
+    // on a second line underneath it when the "Show height" option is on.
+    const showHeights = document.getElementById("showHeights").checked;
+    peaks.forEach(pk => {
+      const px = xToPx(pk.size);
+      const py = yToPx(pk.height);
+      const isArtefact = pk.type !== "True allele";
+      const color = isArtefact ? "#B25E09" : channel.color;
+      const alleleLabel = pk.label + (isArtefact ? ` (${pk.type.toLowerCase()})` : "");
+      const labelY = Math.max(py - 8, rulerBottom + (showHeights ? 20 : 10));
+      ctx.textAlign = "center";
+      ctx.fillStyle = color;
+      ctx.font = (isArtefact ? "italic bold 11px Arial" : "bold 11px Arial");
+      ctx.fillText(alleleLabel, px, labelY);
+      if (showHeights){
+        ctx.fillStyle = "#6b6455";
+        ctx.font = (isArtefact ? "italic 9px Arial" : "9px Arial");
+        ctx.fillText(Math.round(pk.height), px, labelY + 11);
+      }
+    });
+    ctx.textAlign = "left";
+  });
+
+  // bottom axis
+  const lastRowBottom = topMargin + activeChannels.length * rowH - 14;
+  ctx.strokeStyle = "#8a8272";
+  ctx.fillStyle = "#8a8272";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  const tickCount = 8;
+  for (let i = 0; i <= tickCount; i++){
+    const x = xMin + (i / tickCount) * (xMax - xMin);
+    const px = xToPx(x);
+    ctx.beginPath();
+    ctx.moveTo(px, lastRowBottom + 26);
+    ctx.lineTo(px, lastRowBottom + 30);
+    ctx.stroke();
+    ctx.fillText(x.toFixed(0), px, lastRowBottom + 42);
+  }
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#4a4536";
+  ctx.font = "11px Arial";
+  ctx.fillText("Fragment size (bp)", leftMargin + plotW / 2 - 40, canvasH - 4);
+}
+
+function downloadPNG(){
+  const canvas = document.getElementById("epgCanvas");
+  if (!canvas){ alert("Add a locus first, then try downloading."); return; }
+  const link = document.createElement("a");
+  const safeName = (document.getElementById("sampleName").value || "epg").replace(/[^a-z0-9]+/gi, "_");
+  link.download = safeName + ".png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+// ---------------- Init ----------------
+renderLegend();
+renderLibraryButtons();
+loadLibraryProfile(0);
+</script>
+</body>
+</html>
