@@ -107,15 +107,15 @@
     <div class="row">
       <div class="field">
         <label for="sampleName">Sample / case name</label>
-        <input type="text" id="sampleName" class="name" value="Sample 001 — illustrative profile">
+        <input type="text" id="sampleName" class="name" value="Sample 001 — illustrative profile" oninput="renderEPG()">
       </div>
       <div class="field">
         <label for="threshold">Analytical threshold (RFU)</label>
-        <input type="number" id="threshold" value="50" min="0" step="10">
+        <input type="number" id="threshold" value="50" min="0" step="10" oninput="renderEPG()" onchange="renderEPG()">
       </div>
       <div class="field">
         <label for="peakWidth">Peak width (bp)</label>
-        <input type="number" id="peakWidth" value="0.3" min="0.05" step="0.05">
+        <input type="number" id="peakWidth" value="0.3" min="0.05" step="0.05" oninput="renderEPG()" onchange="renderEPG()">
       </div>
       <div class="field">
         <label for="showHeights">Peak labels</label>
@@ -150,21 +150,21 @@
   </div>
 
   <div class="panel">
-    <h2>Loci</h2>
-    <div class="legend" id="legend"></div>
-    <div id="lociContainer"></div>
-    <button class="btn-navy" onclick="addLocus()">+ Add locus</button>
-  </div>
-
-  <div class="panel">
     <h2>Preview</h2>
     <div class="canvas-wrap" id="canvasWrap">
       <div class="empty-msg">Add a locus above, or load a quick-start example, to see the EPG appear here.</div>
     </div>
     <div class="footer-row">
-      <span class="note">Rendering updates automatically as you type.</span>
+      <span class="note">Rendering updates automatically as you type. Peaks below the analytical threshold are drawn but not called (marked “&lt; AT”).</span>
       <button class="btn-amber" onclick="downloadPNG()">Download PNG</button>
     </div>
+  </div>
+
+  <div class="panel">
+    <h2>Loci</h2>
+    <div class="legend" id="legend"></div>
+    <div id="lociContainer"></div>
+    <button class="btn-navy" onclick="addLocus()">+ Add locus</button>
   </div>
 
 </div>
@@ -603,6 +603,11 @@ function renderEPG(){
     ctx.lineTo(leftMargin + plotW, thY);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.fillStyle = "#B25E09";
+    ctx.font = "italic 10px Arial";
+    ctx.textAlign = "right";
+    ctx.fillText("AT " + Math.round(threshold) + " RFU", leftMargin + plotW - 4, thY - 4);
+    ctx.textAlign = "left";
 
     // trace curve (sum of gaussians across this channel)
     ctx.beginPath();
@@ -634,10 +639,22 @@ function renderEPG(){
       const px = xToPx(pk.size);
       const py = yToPx(pk.height);
       const isArtefact = pk.type !== "True allele";
+      const belowAT = pk.height < threshold;
       const color = isArtefact ? "#B25E09" : channel.color;
       const alleleLabel = pk.label + (isArtefact ? ` (${pk.type.toLowerCase()})` : "");
       const labelY = Math.max(py - 8, rulerBottom + (showHeights ? 20 : 10));
       ctx.textAlign = "center";
+      if (belowAT){
+        // below the analytical threshold: drawn, but not called (no allele label)
+        ctx.fillStyle = "#8a8272";
+        ctx.font = "italic 10px Arial";
+        ctx.fillText("< AT", px, labelY);
+        if (showHeights){
+          ctx.font = "9px Arial";
+          ctx.fillText(Math.round(pk.height), px, labelY + 11);
+        }
+        return;
+      }
       ctx.fillStyle = color;
       ctx.font = (isArtefact ? "italic bold 11px Arial" : "bold 11px Arial");
       ctx.fillText(alleleLabel, px, labelY);
